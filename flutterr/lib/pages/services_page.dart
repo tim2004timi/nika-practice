@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_card.dart';
 import '../widgets/custom_input.dart';
-import '../services/data_service.dart';
+import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../models/service.dart';
 import '../utils/formatters.dart';
@@ -21,15 +21,42 @@ class _ServicesPageState extends State<ServicesPage> {
   String _selectedMasterType = 'Все';
   List<Service> _allServices = [];
   List<Service> _filteredServices = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _allServices = DataService.getServices();
-    _filteredServices = _allServices;
+    _loadServices();
     _searchController.addListener(_filterServices);
     _priceFromController.addListener(_filterServices);
     _priceToController.addListener(_filterServices);
+  }
+
+  Future<void> _loadServices() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final services = await ApiService.getServices();
+      setState(() {
+        _allServices = services;
+        _filteredServices = services;
+        _isLoading = false;
+      });
+      _filterServices();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки услуг: ${e.toString()}'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -59,8 +86,22 @@ class _ServicesPageState extends State<ServicesPage> {
         }
 
         // Master type filter
-        if (masterType != 'Все' && service.masterType != masterType.toLowerCase()) {
-          return false;
+        if (masterType != 'Все') {
+          final serviceRole = service.masterRole.toUpperCase();
+          final filterRole = masterType.toUpperCase();
+          // Map Russian names to API roles
+          final roleMap = {
+            'ВИЗАЖИСТ': 'VIZAZHIST',
+            'МАНИКЮРИСТ': 'MANICURIST',
+            'СТИЛИСТ': 'STYLIST',
+            'БРОВИСТ': 'BROWIST',
+          };
+          final apiRole = roleMap[filterRole];
+          if (apiRole != null && serviceRole != apiRole) {
+            return false;
+          } else if (apiRole == null && serviceRole != filterRole) {
+            return false;
+          }
         }
 
         // Price filters
@@ -80,9 +121,13 @@ class _ServicesPageState extends State<ServicesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: _loadServices,
+          color: AppColors.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
@@ -182,7 +227,14 @@ class _ServicesPageState extends State<ServicesPage> {
               ),
               const SizedBox(height: 24),
               // Services list
-              if (_filteredServices.isEmpty)
+              if (_isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_filteredServices.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Center(
@@ -203,7 +255,7 @@ class _ServicesPageState extends State<ServicesPage> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (context) => ServiceDetailPage(serviceId: service.id),
+                              builder: (context) => ServiceDetailPage(serviceId: service.id.toString()),
                             ),
                           );
                         },
@@ -248,6 +300,7 @@ class _ServicesPageState extends State<ServicesPage> {
                 }),
               const SizedBox(height: 80),
             ],
+            ),
           ),
         ),
       ),

@@ -111,3 +111,4 @@ async def register(
         "user": UserResponse.model_validate(user)
     }
 
+

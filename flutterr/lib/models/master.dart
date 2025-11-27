@@ -1,31 +1,30 @@
 class Master {
-  final String id;
-  final String name;
-  final String type;
-  final String phone;
+  final int id;
+  final String fullName;
+  final String role;
+  final String phoneNumber;
+  final int servicesCount;
 
   Master({
     required this.id,
-    required this.name,
-    required this.type,
-    required this.phone,
+    required this.fullName,
+    required this.role,
+    required this.phoneNumber,
+    required this.servicesCount,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'type': type,
-      'phone': phone,
-    };
-  }
+  // Helper getters for compatibility
+  String get name => fullName;
+  String get type => role;
+  String get phone => phoneNumber;
 
   factory Master.fromJson(Map<String, dynamic> json) {
     return Master(
       id: json['id'],
-      name: json['name'],
-      type: json['type'],
-      phone: json['phone'],
+      fullName: json['full_name'],
+      role: json['role'],
+      phoneNumber: json['phone_number'],
+      servicesCount: json['services_count'] ?? 0,
     );
   }
 }

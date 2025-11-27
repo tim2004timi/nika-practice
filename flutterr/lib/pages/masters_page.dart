@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_card.dart';
 import '../widgets/custom_input.dart';
-import '../services/data_service.dart';
+import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../models/master.dart';
-import '../models/service.dart';
 import '../utils/formatters.dart';
 import 'master_services_page.dart';
 
@@ -20,15 +19,40 @@ class _MastersPageState extends State<MastersPage> {
   String _selectedMasterType = 'Все';
   List<Master> _allMasters = [];
   List<Master> _filteredMasters = [];
-  List<Service> _allServices = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _allMasters = DataService.getMasters();
-    _allServices = DataService.getServices();
-    _filteredMasters = _allMasters;
+    _loadMasters();
     _searchController.addListener(_filterMasters);
+  }
+
+  Future<void> _loadMasters() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final masters = await ApiService.getMasters();
+      setState(() {
+        _allMasters = masters;
+        _filteredMasters = masters;
+        _isLoading = false;
+      });
+      _filterMasters();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки мастеров: ${e.toString()}'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -50,8 +74,22 @@ class _MastersPageState extends State<MastersPage> {
         }
 
         // Master type filter
-        if (masterType != 'Все' && master.type != masterType.toLowerCase()) {
-          return false;
+        if (masterType != 'Все') {
+          final masterRole = master.role.toUpperCase();
+          final filterRole = masterType.toUpperCase();
+          // Map Russian names to API roles
+          final roleMap = {
+            'ВИЗАЖИСТ': 'VIZAZHIST',
+            'МАНИКЮРИСТ': 'MANICURIST',
+            'СТИЛИСТ': 'STYLIST',
+            'БРОВИСТ': 'BROWIST',
+          };
+          final apiRole = roleMap[filterRole];
+          if (apiRole != null && masterRole != apiRole) {
+            return false;
+          } else if (apiRole == null && masterRole != filterRole) {
+            return false;
+          }
         }
 
         return true;
@@ -59,17 +97,18 @@ class _MastersPageState extends State<MastersPage> {
     });
   }
 
-  int _getServiceCount(String masterId) {
-    return _allServices.where((s) => s.masterId == masterId).length;
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: _loadMasters,
+          color: AppColors.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
@@ -133,7 +172,14 @@ class _MastersPageState extends State<MastersPage> {
               ),
               const SizedBox(height: 24),
               // Masters list
-              if (_filteredMasters.isEmpty)
+              if (_isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_filteredMasters.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Center(
@@ -148,14 +194,13 @@ class _MastersPageState extends State<MastersPage> {
                 )
               else
                 ..._filteredMasters.map((master) {
-                  final serviceCount = _getServiceCount(master.id);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: CustomCard(
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => MasterServicesPage(masterId: master.id),
+                            builder: (context) => MasterServicesPage(masterId: master.id.toString()),
                           ),
                         );
                       },
@@ -180,7 +225,7 @@ class _MastersPageState extends State<MastersPage> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      Formatters.capitalize(master.type),
+                                      Formatters.formatRole(master.role),
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: AppColors.primary,
@@ -190,7 +235,7 @@ class _MastersPageState extends State<MastersPage> {
                                 ),
                               ),
                               Text(
-                                '$serviceCount услуг',
+                                '${master.servicesCount} услуг',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColors.mutedForeground,
@@ -219,6 +264,7 @@ class _MastersPageState extends State<MastersPage> {
                 }),
               const SizedBox(height: 80),
             ],
+            ),
           ),
         ),
       ),

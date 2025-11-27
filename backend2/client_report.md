@@ -1,7 +1,7 @@
 # Документация API Beauty Salon
 
 ## Базовый URL
-`/api`
+`http://37.9.13.207:8080`
 
 ## Аутентификация
 Большинство эндпоинтов требуют JWT токен в заголовке:
@@ -50,7 +50,7 @@ Authorization: Bearer <token>
 **URL:** `POST /api/auth/token`  
 **Аутентификация:** Не требуется
 
-**Входные данные (Form Data):**
+**Входные данные (Form Data application/x-www-form-urlencoded):**
 - `username`: string (логин пользователя)
 - `password`: string (пароль пользователя)
 
@@ -466,4 +466,5 @@ Authorization: Bearer <token>
 - `MANICURIST` - Маникюрщик
 - `STYLIST` - Стилист
 - `BROWIST` - Бровист
+
 

@@ -3,6 +3,7 @@ import '../widgets/beauty_gradient_text.dart';
 import '../widgets/custom_input.dart';
 import '../widgets/custom_button.dart';
 import '../services/storage_service.dart';
+import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -37,10 +38,30 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _handleRegister() async {
     if (_formKey.currentState!.validate()) {
-      await StorageService.setAuthenticated(true);
-      await StorageService.setUserName(_nameController.text);
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/');
+      try {
+        final response = await ApiService.register(
+          login: _loginController.text,
+          password: _passwordController.text,
+          fullName: _nameController.text,
+          phoneNumber: _phoneController.text,
+        );
+        
+        await StorageService.setToken(response.accessToken);
+        await StorageService.setUserId(response.user.id);
+        await StorageService.setUserName(response.user.fullName);
+        
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ошибка регистрации: ${e.toString()}'),
+              backgroundColor: AppColors.destructive,
+            ),
+          );
+        }
       }
     }
   }

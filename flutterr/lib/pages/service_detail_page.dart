@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_card.dart';
 import '../widgets/custom_button.dart';
-import '../services/data_service.dart';
+import '../services/api_service.dart';
 import '../services/storage_service.dart';
-import '../models/master.dart';
 import '../theme/app_colors.dart';
 import '../models/service.dart';
-import '../models/appointment.dart';
 import '../utils/formatters.dart';
 
 class ServiceDetailPage extends StatefulWidget {
@@ -20,49 +18,83 @@ class ServiceDetailPage extends StatefulWidget {
 
 class _ServiceDetailPageState extends State<ServiceDetailPage> {
   Service? _service;
-  Master? _master;
   DateTime _selectedDate = DateTime.now();
-  String? _selectedTime;
-  List<String> _bookedSlots = [];
+  int? _selectedQuarter;
+  List<int> _freeQuarters = [];
+  bool _isLoading = true;
+  bool _isLoadingQuarters = false;
 
   @override
   void initState() {
     super.initState();
     _loadService();
-    _generateBookedSlots();
   }
 
-  void _loadService() {
-    final service = DataService.getServiceById(widget.serviceId);
-    Master? master;
-    if (service != null) {
-      master = DataService.getMasterById(service.masterId);
-    }
+  Future<void> _loadService() async {
     setState(() {
-      _service = service;
-      _master = master;
+      _isLoading = true;
     });
-  }
-
-  void _generateBookedSlots() {
-    // Generate some random booked slots for demo
-    final random = DateTime.now().millisecondsSinceEpoch % 5;
-    _bookedSlots = [];
-    for (int i = 0; i < random; i++) {
-      final hour = 8 + (i * 2);
-      _bookedSlots.add('${hour.toString().padLeft(2, '0')}:00');
-    }
-  }
-
-  List<String> _generateTimeSlots() {
-    final slots = <String>[];
-    for (int hour = 8; hour < 18; hour++) {
-      slots.add('${hour.toString().padLeft(2, '0')}:00');
-      if (hour < 17) {
-        slots.add('${hour.toString().padLeft(2, '0')}:30');
+    try {
+      final serviceId = int.parse(widget.serviceId);
+      final service = await ApiService.getServiceById(serviceId);
+      setState(() {
+        _service = service;
+        _isLoading = false;
+      });
+      _loadFreeQuarters();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки услуги: ${e.toString()}'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
       }
     }
-    return slots;
+  }
+
+  Future<void> _loadFreeQuarters() async {
+    if (_service == null) return;
+    
+    setState(() {
+      _isLoadingQuarters = true;
+    });
+    
+    try {
+      final dateStr = _formatDateForApi(_selectedDate);
+      final quarters = await ApiService.getFreeQuarters(
+        serviceId: _service!.id,
+        date: dateStr,
+      );
+      setState(() {
+        _freeQuarters = quarters;
+        _isLoadingQuarters = false;
+        // Reset selected quarter if it's not available
+        if (_selectedQuarter != null && !quarters.contains(_selectedQuarter)) {
+          _selectedQuarter = null;
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingQuarters = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки свободных кварталов: ${e.toString()}'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatDateForApi(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
   void _changeDate(int days) {
@@ -73,38 +105,75 @@ class _ServiceDetailPageState extends State<ServiceDetailPage> {
     }
     setState(() {
       _selectedDate = newDate;
-      _selectedTime = null;
-      _generateBookedSlots();
+      _selectedQuarter = null;
     });
+    _loadFreeQuarters();
+  }
+
+  String _quarterToTime(int quarter) {
+    // Quarter 1 = 8:00, each quarter = 30 minutes
+    final startHour = 8;
+    final quarters = quarter - 1;
+    final totalMinutes = startHour * 60 + quarters * 30;
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+  }
+
+  List<int> _generateAllQuarters() {
+    // 20 quarters from 8:00 to 17:30
+    return List.generate(20, (index) => index + 1);
   }
 
   Future<void> _handleBooking() async {
-    if (_selectedTime == null || _service == null) return;
+    if (_selectedQuarter == null || _service == null) return;
 
-    final appointment = Appointment(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      date: Formatters.formatDate(_selectedDate),
-      time: _selectedTime!,
-      serviceName: _service!.name,
-      masterName: _service!.masterName,
-    );
+    try {
+      final clientId = await StorageService.getUserId();
+      if (clientId == null) {
+        throw Exception('Пользователь не авторизован');
+      }
 
-    await StorageService.addAppointment(appointment);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Запись успешно создана'),
-          backgroundColor: AppColors.primary,
-          duration: const Duration(seconds: 2),
-        ),
+      final dateStr = _formatDateForApi(_selectedDate);
+      await ApiService.createAppointment(
+        clientId: clientId,
+        serviceId: _service!.id,
+        date: dateStr,
+        quarter: _selectedQuarter!,
       );
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Запись успешно создана'),
+            backgroundColor: AppColors.primary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка создания записи: ${e.toString()}'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
     if (_service == null) {
       return Scaffold(
         body: Center(
@@ -116,15 +185,21 @@ class _ServiceDetailPageState extends State<ServiceDetailPage> {
       );
     }
 
-    final timeSlots = _generateTimeSlots();
+    final allQuarters = _generateAllQuarters();
     final today = DateTime.now();
     final canGoBack = _selectedDate.isAfter(DateTime(today.year, today.month, today.day));
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await _loadFreeQuarters();
+          },
+          color: AppColors.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Back button
@@ -143,7 +218,7 @@ class _ServiceDetailPageState extends State<ServiceDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _service!.masterName,
+                      _service!.masterFullName,
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -151,30 +226,29 @@ class _ServiceDetailPageState extends State<ServiceDetailPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      Formatters.capitalize(_service!.masterType),
+                      Formatters.formatRole(_service!.masterRole),
                       style: TextStyle(
                         fontSize: 14,
                         color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    if (_master != null)
-                      Row(
-                        children: [
-                          Icon(Icons.phone, size: 16, color: AppColors.mutedForeground),
-                          const SizedBox(width: 8),
-                          Text(
-                            _master!.phone,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.mutedForeground,
-                            ),
+                    Row(
+                      children: [
+                        Icon(Icons.phone, size: 16, color: AppColors.mutedForeground),
+                        const SizedBox(width: 8),
+                        Text(
+                          _service!.masterPhoneNumber,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.mutedForeground,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
                     const Divider(height: 32, color: AppColors.border),
                     Text(
-                      _service!.name,
+                      _service!.title,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -247,7 +321,7 @@ class _ServiceDetailPageState extends State<ServiceDetailPage> {
                 ],
               ),
               const SizedBox(height: 24),
-              // Time selection
+              // Quarter selection
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -260,45 +334,55 @@ class _ServiceDetailPageState extends State<ServiceDetailPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 2.5,
-                    ),
-                    itemCount: timeSlots.length,
-                    itemBuilder: (context, index) {
-                      final time = timeSlots[index];
-                      final isBooked = _bookedSlots.contains(time);
-                      final isSelected = _selectedTime == time;
+                  if (_isLoadingQuarters)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 2.5,
+                      ),
+                      itemCount: allQuarters.length,
+                      itemBuilder: (context, index) {
+                        final quarter = allQuarters[index];
+                        final isFree = _freeQuarters.contains(quarter);
+                        final isSelected = _selectedQuarter == quarter;
+                        final timeStr = _quarterToTime(quarter);
 
-                      return CustomButton(
-                        text: time,
-                        variant: isSelected
-                            ? ButtonVariant.primary
-                            : ButtonVariant.outline,
-                        onPressed: isBooked
-                            ? null
-                            : () {
-                                setState(() {
-                                  _selectedTime = time;
-                                });
-                              },
-                        isFullWidth: false,
-                      );
-                    },
-                  ),
+                        return CustomButton(
+                          text: timeStr,
+                          variant: isSelected
+                              ? ButtonVariant.primary
+                              : ButtonVariant.outline,
+                          onPressed: isFree
+                              ? () {
+                                  setState(() {
+                                    _selectedQuarter = quarter;
+                                  });
+                                }
+                              : null,
+                          isFullWidth: false,
+                        );
+                      },
+                    ),
                 ],
               ),
               const SizedBox(height: 100),
             ],
+            ),
           ),
         ),
       ),
-      bottomNavigationBar: _selectedTime != null
+      bottomNavigationBar: _selectedQuarter != null
           ? Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -322,4 +406,3 @@ class _ServiceDetailPageState extends State<ServiceDetailPage> {
     );
   }
 }
-

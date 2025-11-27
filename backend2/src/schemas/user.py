@@ -37,3 +37,4 @@ class MasterResponse(BaseModel):
     class Config:
         from_attributes = True
 
+

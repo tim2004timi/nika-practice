@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_card.dart';
 import '../widgets/custom_button.dart';
 import '../services/storage_service.dart';
+import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../models/appointment.dart';
 
@@ -23,12 +24,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadData() async {
-    final userName = await StorageService.getUserName();
-    final appointments = await StorageService.getAppointments();
-    setState(() {
-      _userName = userName ?? 'Пользователь';
-      _appointments = appointments;
-    });
+    try {
+      final userName = await StorageService.getUserName();
+      final appointments = await ApiService.getClientAppointments();
+      setState(() {
+        _userName = userName ?? 'Пользователь';
+        _appointments = appointments;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки данных: ${e.toString()}'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _handleLogout() async {
@@ -38,18 +50,33 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _handleCancelAppointment(String id) async {
-    await StorageService.removeAppointment(id);
-    _loadData();
+  Future<void> _handleCancelAppointment(int id) async {
+    try {
+      await ApiService.deleteAppointment(id);
+      _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка отмены записи: ${e.toString()}'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          color: AppColors.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -126,7 +153,7 @@ class _HomePageState extends State<HomePage> {
                                 Row(
                                   children: [
                                     Text(
-                                      appointment.date,
+                                      appointment.formattedDate,
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
@@ -143,7 +170,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      appointment.time,
+                                      appointment.formattedTime,
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
@@ -189,6 +216,7 @@ class _HomePageState extends State<HomePage> {
                 }),
               const SizedBox(height: 80),
             ],
+            ),
           ),
         ),
       ),

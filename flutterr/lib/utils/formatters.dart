@@ -34,5 +34,23 @@ class Formatters {
     if (text.isEmpty) return text;
     return text[0].toUpperCase() + text.substring(1);
   }
+
+  static String formatRole(String role) {
+    final roleUpper = role.toUpperCase();
+    switch (roleUpper) {
+      case 'BROWIST':
+        return 'Бровист';
+      case 'MANICURIST':
+        return 'Мастер маникюра';
+      case 'VIZAZHIST':
+        return 'Визажист';
+      case 'STYLIST':
+        return 'Стилист';
+      case 'CLIENT':
+        return 'Клиент';
+      default:
+        return capitalize(role);
+    }
+  }
 }
 

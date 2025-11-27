@@ -16,3 +16,4 @@ class Service(Base):
         CheckConstraint("price > 0", name="check_price_positive"),
     )
 
+

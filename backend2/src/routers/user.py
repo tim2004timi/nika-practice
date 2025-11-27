@@ -27,3 +27,4 @@ async def get_masters(
     masters = await get_all_masters(db)
     return [MasterResponse(**master) for master in masters]
 
+

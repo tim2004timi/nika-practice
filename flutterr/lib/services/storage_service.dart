@@ -1,28 +1,38 @@
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/appointment.dart';
 
 class StorageService {
-  static const String _keyIsAuthenticated = 'isAuthenticated';
+  static const String _keyToken = 'accessToken';
+  static const String _keyUserId = 'userId';
   static const String _keyUserName = 'userName';
-  static const String _keyAppointments = 'appointments';
 
   static Future<SharedPreferences> get _prefs async =>
       await SharedPreferences.getInstance();
 
-  // Authentication
-  static Future<bool> isAuthenticated() async {
+  // Token management
+  static Future<String?> getToken() async {
     final prefs = await _prefs;
-    return prefs.getString(_keyIsAuthenticated) == 'true';
+    return prefs.getString(_keyToken);
   }
 
-  static Future<void> setAuthenticated(bool value) async {
+  static Future<void> setToken(String token) async {
     final prefs = await _prefs;
-    if (value) {
-      await prefs.setString(_keyIsAuthenticated, 'true');
-    } else {
-      await prefs.remove(_keyIsAuthenticated);
-    }
+    await prefs.setString(_keyToken, token);
+  }
+
+  // User info
+  static Future<bool> isAuthenticated() async {
+    final token = await getToken();
+    return token != null && token.isNotEmpty;
+  }
+
+  static Future<int?> getUserId() async {
+    final prefs = await _prefs;
+    return prefs.getInt(_keyUserId);
+  }
+
+  static Future<void> setUserId(int userId) async {
+    final prefs = await _prefs;
+    await prefs.setInt(_keyUserId, userId);
   }
 
   static Future<String?> getUserName() async {
@@ -37,43 +47,9 @@ class StorageService {
 
   static Future<void> clearAuth() async {
     final prefs = await _prefs;
-    await prefs.remove(_keyIsAuthenticated);
+    await prefs.remove(_keyToken);
+    await prefs.remove(_keyUserId);
     await prefs.remove(_keyUserName);
-  }
-
-  // Appointments
-  static Future<List<Appointment>> getAppointments() async {
-    final prefs = await _prefs;
-    final appointmentsJson = prefs.getString(_keyAppointments);
-    if (appointmentsJson == null) {
-      return [];
-    }
-    try {
-      final List<dynamic> decoded = json.decode(appointmentsJson);
-      return decoded.map((json) => Appointment.fromJson(json)).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  static Future<void> saveAppointments(List<Appointment> appointments) async {
-    final prefs = await _prefs;
-    final appointmentsJson = json.encode(
-      appointments.map((a) => a.toJson()).toList(),
-    );
-    await prefs.setString(_keyAppointments, appointmentsJson);
-  }
-
-  static Future<void> addAppointment(Appointment appointment) async {
-    final appointments = await getAppointments();
-    appointments.add(appointment);
-    await saveAppointments(appointments);
-  }
-
-  static Future<void> removeAppointment(String id) async {
-    final appointments = await getAppointments();
-    appointments.removeWhere((a) => a.id == id);
-    await saveAppointments(appointments);
   }
 }
 

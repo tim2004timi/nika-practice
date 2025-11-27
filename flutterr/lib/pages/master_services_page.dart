@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_card.dart';
 import '../widgets/custom_button.dart';
-import '../services/data_service.dart';
+import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../models/master.dart';
 import '../models/service.dart';
@@ -20,26 +20,42 @@ class MasterServicesPage extends StatefulWidget {
 class _MasterServicesPageState extends State<MasterServicesPage> {
   Master? _master;
   List<Service> _services = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMaster();
-    _loadServices();
+    _loadData();
   }
 
-  void _loadMaster() {
-    final master = DataService.getMasterById(widget.masterId);
+  Future<void> _loadData() async {
     setState(() {
-      _master = master;
+      _isLoading = true;
     });
-  }
-
-  void _loadServices() {
-    final services = DataService.getServicesByMasterId(widget.masterId);
-    setState(() {
-      _services = services;
-    });
+    try {
+      final masterId = int.parse(widget.masterId);
+      final masters = await ApiService.getMasters();
+      final master = masters.firstWhere((m) => m.id == masterId);
+      final services = await ApiService.getServicesByMasterId(masterId);
+      
+      setState(() {
+        _master = master;
+        _services = services;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки данных: ${e.toString()}'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -57,9 +73,13 @@ class _MasterServicesPageState extends State<MasterServicesPage> {
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          color: AppColors.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Back button
@@ -86,7 +106,7 @@ class _MasterServicesPageState extends State<MasterServicesPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      Formatters.capitalize(_master!.type),
+                      Formatters.formatRole(_master!.role),
                       style: TextStyle(
                         fontSize: 14,
                         color: AppColors.primary,
@@ -119,7 +139,14 @@ class _MasterServicesPageState extends State<MasterServicesPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (_services.isEmpty)
+              if (_isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_services.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Center(
@@ -136,14 +163,14 @@ class _MasterServicesPageState extends State<MasterServicesPage> {
                 ..._services.map((service) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: CustomCard(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => ServiceDetailPage(serviceId: service.id),
-                          ),
-                        );
-                      },
+                      child: CustomCard(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => ServiceDetailPage(serviceId: service.id.toString()),
+                            ),
+                          );
+                        },
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -172,6 +199,7 @@ class _MasterServicesPageState extends State<MasterServicesPage> {
                 }),
               const SizedBox(height: 80),
             ],
+            ),
           ),
         ),
       ),

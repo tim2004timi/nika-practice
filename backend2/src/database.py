@@ -8,6 +8,7 @@ from src.models.base import Base
 from src.models.user import User
 from src.models.service import Service
 from src.models.appointment import Appointment
+from src.models.payment import Payment
 
 # Асинхронный URL для подключения к MySQL
 DATABASE_URL = settings.DATABASE_URL

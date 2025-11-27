@@ -3,6 +3,7 @@ import '../widgets/beauty_gradient_text.dart';
 import '../widgets/custom_input.dart';
 import '../widgets/custom_button.dart';
 import '../services/storage_service.dart';
+import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 
 class LoginPage extends StatefulWidget {
@@ -26,10 +27,28 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      await StorageService.setAuthenticated(true);
-      await StorageService.setUserName(_loginController.text);
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/');
+      try {
+        final response = await ApiService.login(
+          username: _loginController.text,
+          password: _passwordController.text,
+        );
+        
+        await StorageService.setToken(response.accessToken);
+        await StorageService.setUserId(response.user.id);
+        await StorageService.setUserName(response.user.fullName);
+        
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ошибка входа: ${e.toString()}'),
+              backgroundColor: AppColors.destructive,
+            ),
+          );
+        }
       }
     }
   }
