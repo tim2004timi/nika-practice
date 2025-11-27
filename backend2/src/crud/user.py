@@ -3,7 +3,7 @@ from sqlalchemy import select, func
 from typing import Optional
 
 from src.models.user import User
-from src.schemas.user import UserCreate
+from src.schemas.user import UserCreate, UserUpdate
 from src.utils import get_password_hash
 
 
@@ -68,4 +68,26 @@ async def get_all_masters(db: AsyncSession) -> list[dict]:
         }
         for row in rows
     ]
+
+
+async def update_user(
+    db: AsyncSession,
+    user_id: int,
+    user_update: UserUpdate
+) -> Optional[User]:
+    """Обновляет пользователя (частичное обновление)"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    db_user = result.scalar_one_or_none()
+    
+    if not db_user:
+        return None
+    
+    update_data = user_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        if value is not None:
+            setattr(db_user, field, value)
+    
+    await db.commit()
+    await db.refresh(db_user)
+    return db_user
 

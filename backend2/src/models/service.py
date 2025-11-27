@@ -9,11 +9,12 @@ class Service(Base):
     title = Column(String(255), nullable=False)
     duration_quarters = Column(Integer, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
-    master_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    master_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     __table_args__ = (
         CheckConstraint("duration_quarters > 0", name="check_duration_positive"),
         CheckConstraint("price > 0", name="check_price_positive"),
     )
+
 
 

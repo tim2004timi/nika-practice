@@ -27,6 +27,11 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+
+
 class MasterResponse(BaseModel):
     id: int
     full_name: str
@@ -36,5 +41,6 @@ class MasterResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 
