@@ -33,10 +33,6 @@ class AppointmentDetailResponse(AppointmentListResponse):
 
 
 class AppointmentUpdate(BaseModel):
-    client_id: Optional[int] = None
-    service_id: Optional[int] = None
-    date: Optional[date] = None
-    quarter: Optional[int] = Field(None, ge=1, le=20)
     status: Optional[str] = Field(None, pattern="^(booked|in_progress|completed)$")
     is_paid: Optional[bool] = None
 

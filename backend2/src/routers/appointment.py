@@ -6,11 +6,12 @@ from src.auth import get_current_user
 from src.models.user import User
 from src.models.service import Service
 from src.models.appointment import Appointment
-from src.schemas.appointment import AppointmentCreate, AppointmentListResponse, AppointmentDetailResponse
+from src.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentListResponse, AppointmentDetailResponse
 from src.crud.appointment import (
     get_all_appointments,
     get_appointment_by_id,
     create_appointment,
+    update_appointment,
     delete_appointment,
     validate_appointment,
     get_appointments_by_client,
@@ -177,6 +178,52 @@ async def create_appointment_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Master not found"
+        )
+    
+    return AppointmentDetailResponse(
+        id=appointment.id,
+        date=appointment.date,
+        quarter=appointment.quarter,
+        status=appointment.status,
+        is_paid=appointment.is_paid,
+        master_full_name=master.full_name,
+        service_title=service.title,
+        service_price=service.price,
+        client_full_name=client.full_name
+    )
+
+
+@router.put("/{appointment_id}", response_model=AppointmentDetailResponse)
+async def update_appointment_endpoint(
+    appointment_id: int,
+    appointment_update: AppointmentUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Обновление записи (статус и статус оплаты)"""
+    update_data = appointment_update.model_dump(exclude_unset=True)
+    appointment = await update_appointment(db, appointment_id, update_data)
+    
+    if not appointment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Appointment not found"
+        )
+    
+    # Получаем информацию для ответа
+    client = await get_user_by_id(db, appointment.client_id)
+    service = await get_service_by_id(db, appointment.service_id)
+    if not service:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Service not found"
+        )
+    
+    master = await get_user_by_id(db, service.master_id)
+    if not master or not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Related entity not found"
         )
     
     return AppointmentDetailResponse(
