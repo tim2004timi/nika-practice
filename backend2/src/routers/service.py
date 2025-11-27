@@ -48,6 +48,35 @@ async def get_services(
     return result
 
 
+@router.get("/masters/me", response_model=list[ServiceListResponse])
+async def get_my_services(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Получение услуг текущего мастера"""
+    services = await get_services_by_master_id(db, current_user.id)
+    
+    # Получаем информацию о мастере
+    master = await get_user_by_id(db, current_user.id)
+    if not master:
+        return []
+    
+    result = []
+    for service in services:
+        result.append(ServiceListResponse(
+            id=service.id,
+            title=service.title,
+            price=service.price,
+            duration_quarters=service.duration_quarters,
+            master_id=service.master_id,
+            master_full_name=master.full_name,
+            master_role=master.role,
+            master_phone_number=master.phone_number
+        ))
+    
+    return result
+
+
 @router.get("/masters/{master_id}", response_model=list[ServiceListResponse])
 async def get_master_services(
     master_id: int,
