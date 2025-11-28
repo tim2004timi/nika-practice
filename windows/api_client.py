@@ -214,52 +214,26 @@ class APIClient:
         self._handle_response(response)
     
     def update_appointment_status(self, appointment_id: int, status: str) -> Dict[str, Any]:
-        """Обновить статус записи
-        
-        Примечание: API может не поддерживать обновление записей.
-        Если запрос не поддерживается, будет выброшено исключение APIError.
-        """
-        # Получаем текущую запись
-        appointment = self.get_appointment(appointment_id)
-        # Пытаемся обновить через PUT (если API поддерживает)
+        """Обновить статус записи"""
         url = f"{self.BASE_URL}/api/appointments/{appointment_id}"
+        # Получаем текущую запись для сохранения is_paid
+        appointment = self.get_appointment(appointment_id)
         data = {
-            "date": appointment["date"],
-            "quarter": appointment["quarter"],
             "status": status,
             "is_paid": appointment.get("is_paid", False)
         }
-        # Если в ответе есть client_id и service_id, добавляем их
-        if "client_id" in appointment:
-            data["client_id"] = appointment["client_id"]
-        if "service_id" in appointment:
-            data["service_id"] = appointment["service_id"]
-        
         response = requests.put(url, json=data, headers=self._get_headers())
         return self._handle_response(response)
     
     def update_appointment_paid(self, appointment_id: int, is_paid: bool) -> Dict[str, Any]:
-        """Обновить статус оплаты записи
-        
-        Примечание: API может не поддерживать обновление записей.
-        Если запрос не поддерживается, будет выброшено исключение APIError.
-        """
-        # Получаем текущую запись
-        appointment = self.get_appointment(appointment_id)
-        # Пытаемся обновить через PUT (если API поддерживает)
+        """Обновить статус оплаты записи"""
         url = f"{self.BASE_URL}/api/appointments/{appointment_id}"
+        # Получаем текущую запись для сохранения status
+        appointment = self.get_appointment(appointment_id)
         data = {
-            "date": appointment["date"],
-            "quarter": appointment["quarter"],
-            "status": appointment["status"],
+            "status": appointment.get("status", "booked"),
             "is_paid": is_paid
         }
-        # Если в ответе есть client_id и service_id, добавляем их
-        if "client_id" in appointment:
-            data["client_id"] = appointment["client_id"]
-        if "service_id" in appointment:
-            data["service_id"] = appointment["service_id"]
-        
         response = requests.put(url, json=data, headers=self._get_headers())
         return self._handle_response(response)
     
