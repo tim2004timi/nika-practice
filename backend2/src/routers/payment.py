@@ -8,6 +8,7 @@ from src.schemas.payment import PaymentCreate, PaymentResponse
 from src.crud.payment import get_payments_by_master, create_payment, quarter_to_time
 from src.crud.appointment import get_appointment_by_id
 from src.crud.service import get_service_by_id
+from src.crud.user import get_user_by_id
 
 router = APIRouter(prefix="/payments")
 

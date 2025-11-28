@@ -5,11 +5,9 @@ from typing import List, Optional
 from src.models.payment import Payment
 from src.models.appointment import Appointment
 from src.models.service import Service
-from src.models.user import User
 from src.schemas.payment import PaymentCreate
 from src.crud.service import get_service_by_id
 from src.crud.user import get_user_by_id
-from src.crud.appointment import get_appointment_by_id
 
 
 def quarter_to_time(quarter: int) -> str:
@@ -92,7 +90,7 @@ async def create_payment(
         amount=payment_create.amount
     )
     db.add(db_payment)
-    await db.commit()
+    await db.flush()  # Используем flush вместо commit, так как get_db сам делает commit
     await db.refresh(db_payment)
     return db_payment
 

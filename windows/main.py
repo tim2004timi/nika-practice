@@ -432,16 +432,18 @@ class HomePage(QWidget):
                 lambda text, app_id=appointment["id"]: self.update_status(app_id, text)
             )
             
-            # Кнопка оплаты
-            paid_btn = QPushButton("Оплата" if not appointment["is_paid"] else "Отменить")
-            paid_btn.setProperty("buttonStyle", "outline")
-            paid_btn.setStyleSheet("font-size: 11px; padding: 4px 8px; min-height: 24px;")
-            paid_btn.clicked.connect(
-                lambda checked, app_id=appointment["id"]: self.toggle_payment(app_id)
-            )
-            
             right_controls.addWidget(status_combo)
-            right_controls.addWidget(paid_btn)
+            
+            # Кнопка оплаты (только если не оплачено)
+            if not appointment["is_paid"]:
+                paid_btn = QPushButton("Оплата")
+                paid_btn.setProperty("buttonStyle", "outline")
+                paid_btn.setStyleSheet("font-size: 11px; padding: 4px 8px; min-height: 24px;")
+                paid_btn.clicked.connect(
+                    lambda checked, app_id=appointment["id"]: self.toggle_payment(app_id)
+                )
+                right_controls.addWidget(paid_btn)
+            
             right_controls.addStretch()
             
             card_layout.addLayout(left_info, 1)
@@ -470,21 +472,19 @@ class HomePage(QWidget):
     
     def toggle_payment(self, appointment_id: int):
         try:
-            # Получаем текущую запись
+            # Получаем текущую запись для получения цены услуги
             appointment = self.api_client.get_appointment(appointment_id)
-            new_status = not appointment["is_paid"]
             
-            # Обновляем статус оплаты
-            self.api_client.update_appointment_paid(appointment_id, new_status)
+            # Устанавливаем оплату
+            self.api_client.update_appointment_paid(appointment_id, True)
             
-            # Если оплата установлена, создаем запись об оплате
-            if new_status:
-                amount = float(appointment["service_price"])
-                self.api_client.create_payment(appointment_id, amount)
+            # Создаем запись об оплате
+            amount = float(appointment["service_price"])
+            self.api_client.create_payment(appointment_id, amount)
             
             self.load_appointments()
         except APIError as e:
-            QMessageBox.warning(self, "Ошибка", e.message)
+            QMessageBox.warning(self, "Ошибка", f"{e.message} (Код: {e.status_code})")
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка: {str(e)}")
 

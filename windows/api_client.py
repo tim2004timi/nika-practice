@@ -25,7 +25,10 @@ class APIClient:
     
     def _get_headers(self, include_auth: bool = True) -> Dict[str, str]:
         """Получить заголовки для запроса"""
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
         if include_auth and self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
@@ -79,10 +82,18 @@ class APIClient:
         """Вход пользователя"""
         url = f"{self.BASE_URL}/api/auth/token"
         data = {
+            "grant_type": "",
             "username": username,
-            "password": password
+            "password": password,
+            "scope": "",
+            "client_id": "",
+            "client_secret": ""
         }
-        response = requests.post(url, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"})
+        headers = {
+            "accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        response = requests.post(url, data=data, headers=headers)
         result = self._handle_response(response)
         self.token = result["access_token"]
         self.user = result["user"]
@@ -189,7 +200,23 @@ class APIClient:
     def get_appointment(self, appointment_id: int) -> Dict[str, Any]:
         """Получить запись по ID"""
         url = f"{self.BASE_URL}/api/appointments/{appointment_id}"
-        response = requests.get(url, headers=self._get_headers())
+        headers = self._get_headers()
+        
+        # Выводим информацию о запросе в консоль
+        import json
+        print("=" * 50)
+        print("GET запрос на получение записи:")
+        print(f"URL: {url}")
+        print(f"Headers: {json.dumps(headers, indent=2, ensure_ascii=False)}")
+        print("=" * 50)
+        
+        response = requests.get(url, headers=headers)
+        
+        # Выводим ответ
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {response.text[:200]}...")  # Первые 200 символов
+        print("=" * 50)
+        
         return self._handle_response(response)
     
     def create_appointment(self, client_id: int, service_id: int, date_str: str,
@@ -216,11 +243,9 @@ class APIClient:
     def update_appointment_status(self, appointment_id: int, status: str) -> Dict[str, Any]:
         """Обновить статус записи"""
         url = f"{self.BASE_URL}/api/appointments/{appointment_id}"
-        # Получаем текущую запись для сохранения is_paid
-        appointment = self.get_appointment(appointment_id)
+        # Отправляем только status
         data = {
-            "status": status,
-            "is_paid": appointment.get("is_paid", False)
+            "status": status
         }
         response = requests.put(url, json=data, headers=self._get_headers())
         return self._handle_response(response)
@@ -228,13 +253,28 @@ class APIClient:
     def update_appointment_paid(self, appointment_id: int, is_paid: bool) -> Dict[str, Any]:
         """Обновить статус оплаты записи"""
         url = f"{self.BASE_URL}/api/appointments/{appointment_id}"
-        # Получаем текущую запись для сохранения status
-        appointment = self.get_appointment(appointment_id)
+        # Отправляем только is_paid, как в curl запросе
         data = {
-            "status": appointment.get("status", "booked"),
             "is_paid": is_paid
         }
-        response = requests.put(url, json=data, headers=self._get_headers())
+        headers = self._get_headers()
+        
+        # Выводим информацию о запросе в консоль
+        import json
+        print("=" * 50)
+        print("PUT запрос на обновление оплаты:")
+        print(f"URL: {url}")
+        print(f"Headers: {json.dumps(headers, indent=2, ensure_ascii=False)}")
+        print(f"Data: {json.dumps(data, indent=2, ensure_ascii=False)}")
+        print("=" * 50)
+        
+        response = requests.put(url, json=data, headers=headers)
+        
+        # Выводим ответ
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {response.text}")
+        print("=" * 50)
+        
         return self._handle_response(response)
     
     # ========== Оплаты ==========
@@ -252,6 +292,23 @@ class APIClient:
             "appointment_id": appointment_id,
             "amount": str(amount)
         }
-        response = requests.post(url, json=data, headers=self._get_headers())
+        headers = self._get_headers()
+        
+        # Выводим информацию о запросе в консоль
+        import json
+        print("=" * 50)
+        print("POST запрос на создание оплаты:")
+        print(f"URL: {url}")
+        print(f"Headers: {json.dumps(headers, indent=2, ensure_ascii=False)}")
+        print(f"Data: {json.dumps(data, indent=2, ensure_ascii=False)}")
+        print("=" * 50)
+        
+        response = requests.post(url, json=data, headers=headers)
+        
+        # Выводим ответ
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {response.text}")
+        print("=" * 50)
+        
         return self._handle_response(response)
 
